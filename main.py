@@ -37,7 +37,11 @@ def make_api_request(text):
 
     # Make request to PaLM API
     palm_url = "https://api.palm.com/process"
-    palm_payload = {"text": text}
+    palm_payload = {
+        "text": text,
+        "api_key": "AIzaSyAeXIPpjwPdGJjLEvj2A-S4Ix7RT1nRrsEn",
+        "response_type": "audio"
+    }
     palm_response = requests.post(palm_url, json=palm_payload)
     palm_data = palm_response.json()
 
@@ -56,4 +60,3 @@ while True:
 
         # Process the responses and perform actions
         # ...
-
