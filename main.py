@@ -1,5 +1,7 @@
 import speech_recognition as sr
 import requests
+import pygame
+import io
 
 # Define the wake word
 WAKE_WORD = "Jarvis"
@@ -47,6 +49,14 @@ def make_api_request(text):
 
     return bard_data, palm_data
 
+# Function to play audio
+def play_audio(audio_data):
+    pygame.mixer.init()
+    pygame.mixer.music.load(io.BytesIO(audio_data))
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        continue
+
 # Main loop
 while True:
     # Listen for the wake word
@@ -60,3 +70,8 @@ while True:
 
         # Process the responses and perform actions
         # ...
+
+        # Play the audio response from PaLM API
+        audio_response = palm_data.get("audio")
+        if audio_response:
+            play_audio(audio_response)
