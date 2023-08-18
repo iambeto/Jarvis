@@ -8,7 +8,7 @@ import warnings
 import time
 import os
 
-wake_word = 'friday'
+wake_word = 'jarvis'
 model = GPT4All("/Users/rob/Library/Application Support/nomic.ai/GPT4All/ggml-model-gpt4all-falcon-q4_0.bin")
 r = sr.Recognizer()
 tiny_model = whisper.load_model("tiny")
