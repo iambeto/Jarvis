@@ -1,77 +1,81 @@
+from os import system
 import speech_recognition as sr
-import requests
-import pygame
-import io
+from playsound import playsound
+from gpt4all import GPT4All
+import sys
+import whisper
+import warnings
+import time
+import os
 
-# Define the wake word
-WAKE_WORD = "Jarvis"
-
-# Initialize the recognizer
+wake_word = 'friday'
+model = GPT4All("/Users/rob/Library/Application Support/nomic.ai/GPT4All/ggml-model-gpt4all-falcon-q4_0.bin")
 r = sr.Recognizer()
+tiny_model = whisper.load_model("tiny")
+base_model = whisper.load_model("base")
+listening_for_wake_word = True
+source = sr.Microphone() 
+warnings.filterwarnings("ignore", category=UserWarning, module='whisper.transcribe', lineno=114)
 
-# Function to capture audio
-def capture_audio():
-    with sr.Microphone() as source:
-        print("Listening...")
-        audio = r.listen(source)
-    return audio
+if sys.platform != 'darwin':
+    import pyttsx3
+    engine = pyttsx3.init() 
 
-# Function to convert speech to text
-def speech_to_text(audio):
+def speak(text):
+    if sys.platform == 'darwin':
+        ALLOWED_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?!-_$:+-/ ")
+        clean_text = ''.join(c for c in text if c in ALLOWED_CHARS)
+        system(f"say '{clean_text}'")
+    else:
+        engine.say(text)
+        engine.runAndWait()
+
+def listen_for_wake_word(audio):
+    global listening_for_wake_word
+    with open("wake_detect.wav", "wb") as f:
+        f.write(audio.get_wav_data())
+    result = tiny_model.transcribe('wake_detect.wav')
+    text_input = result['text']
+    if wake_word in text_input.lower().strip():
+        print("Wake word detected. Please speak your prompt to GPT4All.")
+        speak('Listening')
+        listening_for_wake_word = False
+
+def prompt_gpt(audio):
+    global listening_for_wake_word
     try:
-        text = r.recognize_google(audio)
-        print("You said:", text)
-        return text
-    except sr.UnknownValueError:
-        print("Sorry, I could not understand.")
-        return ""
-    except sr.RequestError as e:
-        print("Sorry, an error occurred while processing the audio:", str(e))
-        return ""
+        with open("prompt.wav", "wb") as f:
+            f.write(audio.get_wav_data())
+        result = base_model.transcribe('prompt.wav')
+        prompt_text = result['text']
+        if len(prompt_text.strip()) == 0:
+            print("Empty prompt. Please speak again.")
+            speak("Empty prompt. Please speak again.")
+            listening_for_wake_word = True
+        else:
+            print('User: ' + prompt_text)
+            output = model.generate(prompt_text, max_tokens=200)
+            print('GPT4All: ', output)
+            speak(output)
+            print('\nSay', wake_word, 'to wake me up. \n')
+            listening_for_wake_word = True
+    except Exception as e:
+        print("Prompt error: ", e)
 
-# Function to make API requests
-def make_api_request(text):
-    # Make request to Bard API
-    bard_url = "https://api.bard.com/query"
-    bard_payload = {"text": text}
-    bard_response = requests.post(bard_url, json=bard_payload)
-    bard_data = bard_response.json()
+def callback(recognizer, audio):
+    global listening_for_wake_word
+    if listening_for_wake_word:
+        listen_for_wake_word(audio)
+    else:
+        prompt_gpt(audio)
 
-    # Make request to PaLM API
-    palm_url = "https://api.palm.com/process"
-    palm_payload = {
-        "text": text,
-        "api_key": "AIzaSyAeXIPpjwPdGJjLEvj2A-S4Ix7RT1nRrsEn",
-        "response_type": "audio"
-    }
-    palm_response = requests.post(palm_url, json=palm_payload)
-    palm_data = palm_response.json()
+def start_listening():
+    with source as s:
+        r.adjust_for_ambient_noise(s, duration=2)
+    print('\nSay', wake_word, 'to wake me up. \n')
+    r.listen_in_background(source, callback)
+    while True:
+        time.sleep(1) 
 
-    return bard_data, palm_data
-
-# Function to play audio
-def play_audio(audio_data):
-    pygame.mixer.init()
-    pygame.mixer.music.load(io.BytesIO(audio_data))
-    pygame.mixer.music.play()
-    while pygame.mixer.music.get_busy():
-        continue
-
-# Main loop
-while True:
-    # Listen for the wake word
-    audio = capture_audio()
-    text = speech_to_text(audio)
-
-    # Check if the wake word is detected
-    if WAKE_WORD in text.lower():
-        # Make API requests
-        bard_data, palm_data = make_api_request(text)
-
-        # Process the responses and perform actions
-        # ...
-
-        # Play the audio response from PaLM API
-        audio_response = palm_data.get("audio")
-        if audio_response:
-            play_audio(audio_response)
+if __name__ == '__main__':
+    start_listening() 
