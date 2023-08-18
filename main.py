@@ -2,7 +2,7 @@ import speech_recognition as sr
 import requests
 
 # Define the wake word
-WAKE_WORD = "assistant"
+WAKE_WORD = "Jarvis"
 
 # Initialize the recognizer
 r = sr.Recognizer()
